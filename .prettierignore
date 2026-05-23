@@ -1,0 +1,19 @@
+node_modules
+dist
+.next
+build
+out
+coverage
+.turbo
+pnpm-lock.yaml
+**/.next/**
+**/dist/**
+**/coverage/**
+apps/api/prisma/migrations
+.git
+
+# Hand-authored documentation — keep manual formatting
+project-planning/
+prompts/
+AGENT.md
+README.md
