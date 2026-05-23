@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum ConversationStatus {
+  active
+  completed
+  cancelled
+  archived
+}
+
+enum MessageRole {
+  system
+  user
+  assistant
+  tool
+}
+
+enum MessageStatus {
+  completed
+  streaming
+  cancelled
+  failed
+}
+
+enum InferenceStatus {
+  queued
+  started
+  streaming
+  completed
+  failed
+  cancelled
+}
+
+enum InferenceEventType {
+  request_started
+  first_token
+  stream_delta
+  request_completed
+  request_failed
+  request_cancelled
+}
+
+enum IngestionStatus {
+  received
+  validated
+  processed
+  failed
+}
+
+enum QueueJobStatus {
+  queued
+  running
+  completed
+  failed
+  dead_letter
+}
+
+// ─── Tables ───────────────────────────────────────────────────────────────────
+
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  email         String?        @unique
+  name          String?
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+  conversations Conversation[]
+
+  @@map("users")
+}
+
+model Conversation {
+  id                String             @id @default(uuid()) @db.Uuid
+  userId            String?            @map("user_id") @db.Uuid
+  title             String
+  status            ConversationStatus @default(active)
+  lastMessageAt     DateTime?          @map("last_message_at") @db.Timestamptz
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+  user              User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages          Message[]
+  inferenceRequests InferenceRequest[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([status, updatedAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model Message {
+  id                   String             @id @default(uuid()) @db.Uuid
+  conversationId       String             @map("conversation_id") @db.Uuid
+  role                 MessageRole
+  content              String
+  contentPreview       String?            @map("content_preview")
+  sequenceNumber       Int                @map("sequence_number")
+  status               MessageStatus      @default(completed)
+  providerMessageId    String?            @map("provider_message_id")
+  metadata             Json?
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+  conversation         Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  inferenceAsUser      InferenceRequest[] @relation("UserMessage")
+  inferenceAsAssistant InferenceRequest[] @relation("AssistantMessage")
+
+  @@unique([conversationId, sequenceNumber])
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model InferenceRequest {
+  id                 String           @id @default(uuid()) @db.Uuid
+  conversationId     String           @map("conversation_id") @db.Uuid
+  userMessageId      String?          @map("user_message_id") @db.Uuid
+  assistantMessageId String?          @map("assistant_message_id") @db.Uuid
+  sessionId          String           @map("session_id")
+  provider           String
+  model              String
+  status             InferenceStatus  @default(queued)
+  requestStartedAt   DateTime         @map("request_started_at") @db.Timestamptz
+  firstTokenAt       DateTime?        @map("first_token_at") @db.Timestamptz
+  completedAt        DateTime?        @map("completed_at") @db.Timestamptz
+  latencyMs          Int?             @map("latency_ms")
+  timeToFirstTokenMs Int?             @map("time_to_first_token_ms")
+  inputTokens        Int?             @map("input_tokens")
+  outputTokens       Int?             @map("output_tokens")
+  totalTokens        Int?             @map("total_tokens")
+  inputPreview       String?          @map("input_preview")
+  outputPreview      String?          @map("output_preview")
+  errorCode          String?          @map("error_code")
+  errorMessage       String?          @map("error_message")
+  requestMetadata    Json?            @map("request_metadata")
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+  conversation       Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userMessage        Message?         @relation("UserMessage", fields: [userMessageId], references: [id], onDelete: SetNull)
+  assistantMessage   Message?         @relation("AssistantMessage", fields: [assistantMessageId], references: [id], onDelete: SetNull)
+  events             InferenceEvent[]
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([provider, model, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([sessionId])
+  @@index([requestStartedAt(sort: Desc)])
+  @@map("inference_requests")
+}
+
+model InferenceEvent {
+  id                 String             @id @default(uuid()) @db.Uuid
+  inferenceRequestId String?            @map("inference_request_id") @db.Uuid
+  eventType          InferenceEventType @map("event_type")
+  eventTimestamp     DateTime           @map("event_timestamp") @db.Timestamptz
+  payload            Json
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  inferenceRequest   InferenceRequest?  @relation(fields: [inferenceRequestId], references: [id], onDelete: Cascade)
+
+  @@index([inferenceRequestId, eventTimestamp])
+  @@index([eventType, eventTimestamp(sort: Desc)])
+  @@map("inference_events")
+}
+
+model IngestionLog {
+  id                String          @id @default(uuid()) @db.Uuid
+  source            String
+  sourceEventId     String?         @map("source_event_id")
+  requestId         String?         @map("request_id")
+  status            IngestionStatus @default(received)
+  payloadVersion    String          @map("payload_version")
+  receivedAt        DateTime        @map("received_at") @db.Timestamptz
+  processedAt       DateTime?       @map("processed_at") @db.Timestamptz
+  errorMessage      String?         @map("error_message")
+  rawPayload        Json            @map("raw_payload")
+  normalizedPayload Json?           @map("normalized_payload")
+
+  @@unique([source, sourceEventId], name: "unique_source_event")
+  @@index([status, receivedAt(sort: Desc)])
+  @@index([source, receivedAt(sort: Desc)])
+  @@map("ingestion_logs")
+}
+
+model QueueJob {
+  id           String         @id @default(uuid()) @db.Uuid
+  jobType      String         @map("job_type")
+  entityType   String         @map("entity_type")
+  entityId     String?        @map("entity_id") @db.Uuid
+  status       QueueJobStatus @default(queued)
+  attemptCount Int            @default(0) @map("attempt_count")
+  lastError    String?        @map("last_error")
+  availableAt  DateTime       @map("available_at") @db.Timestamptz
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status, availableAt])
+  @@index([jobType, status])
+  @@map("queue_jobs")
+}
+
+model ProviderConfig {
+  id           String   @id @default(uuid()) @db.Uuid
+  provider     String   @unique
+  displayName  String   @map("display_name")
+  isEnabled    Boolean  @default(true) @map("is_enabled")
+  defaultModel String   @map("default_model")
+  timeoutMs    Int      @map("timeout_ms")
+  settings     Json
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("provider_configs")
+}
