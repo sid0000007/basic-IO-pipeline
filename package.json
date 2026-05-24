@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm -r --parallel --stream dev",
+    "dev:worker": "pnpm --filter @olives/api dev:worker",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
@@ -17,9 +18,10 @@
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
     "infra:logs": "docker compose logs -f",
-    "db:migrate": "pnpm --filter @olives/api prisma migrate dev",
-    "db:studio": "pnpm --filter @olives/api prisma studio",
-    "db:generate": "pnpm --filter @olives/api prisma generate"
+    "db:migrate": "pnpm --filter @olives/api exec prisma migrate dev",
+    "db:migrate:deploy": "pnpm --filter @olives/api exec prisma migrate deploy",
+    "db:studio": "pnpm --filter @olives/api exec prisma studio",
+    "db:generate": "pnpm --filter @olives/api exec prisma generate"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

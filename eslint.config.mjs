@@ -33,5 +33,25 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
     },
   },
+  {
+    // Apps must consume Zod schemas + inferred types from @olives/types.
+    // packages/types is the single home for Zod schemas (user's global rule).
+    // This excludes the test directory — specs can need raw zod for fixtures.
+    files: ['apps/api/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'zod',
+              message:
+                'Import schemas + inferred types from @olives/types. New Zod schemas must be authored in packages/types and re-exported.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   prettier,
 );

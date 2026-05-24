@@ -32,6 +32,105 @@ services:
       timeout: 5s
       retries: 10
 
+  # ── Phase 3 application services. ──────────────────────────────────────────
+  # Local dev still runs api / web / worker on the host via `pnpm dev` —
+  # these compose services are for production / CI builds.
+  # Toggle by running `docker compose --profile apps up --build`.
+
+  api:
+    image: olives-api:${TAG:-latest}
+    profiles: ['apps']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: olives-api
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-olives}:${POSTGRES_PASSWORD:-olives}@postgres:5432/${POSTGRES_DB:-olives}
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: info
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      INGESTION_API_KEY: ${INGESTION_API_KEY}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      CHAT_CONTEXT_MESSAGE_LIMIT: ${CHAT_CONTEXT_MESSAGE_LIMIT:-20}
+      INGESTION_QUEUE_CONCURRENCY: ${INGESTION_QUEUE_CONCURRENCY:-5}
+      INGESTION_MAX_ATTEMPTS: ${INGESTION_MAX_ATTEMPTS:-5}
+      PII_REDACTION_ENABLED: ${PII_REDACTION_ENABLED:-true}
+      THROTTLER_TTL_SECONDS: ${THROTTLER_TTL_SECONDS:-60}
+      THROTTLER_CHAT_LIMIT: ${THROTTLER_CHAT_LIMIT:-30}
+      THROTTLER_INGESTION_LIMIT: ${THROTTLER_INGESTION_LIMIT:-600}
+      RETENTION_DAYS: ${RETENTION_DAYS:-90}
+    command: ['sh', '-c', 'pnpm exec prisma migrate deploy && node dist/main.js']
+    ports:
+      - '${API_PORT:-3001}:3001'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3001/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  worker:
+    image: olives-api:${TAG:-latest}
+    profiles: ['apps']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: olives-worker
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      api: { condition: service_healthy } # wait for migrations to apply
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-olives}:${POSTGRES_PASSWORD:-olives}@postgres:5432/${POSTGRES_DB:-olives}
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: info
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      INGESTION_API_KEY: ${INGESTION_API_KEY}
+      # Even though the worker doesn't serve HTTP, env validation enforces all
+      # of these. PORT / CORS_ORIGIN / etc. need values or the worker won't boot.
+      PORT: 3001
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      CHAT_CONTEXT_MESSAGE_LIMIT: ${CHAT_CONTEXT_MESSAGE_LIMIT:-20}
+      INGESTION_QUEUE_CONCURRENCY: ${INGESTION_QUEUE_CONCURRENCY:-5}
+      INGESTION_MAX_ATTEMPTS: ${INGESTION_MAX_ATTEMPTS:-5}
+      PII_REDACTION_ENABLED: ${PII_REDACTION_ENABLED:-true}
+      THROTTLER_TTL_SECONDS: ${THROTTLER_TTL_SECONDS:-60}
+      THROTTLER_CHAT_LIMIT: ${THROTTLER_CHAT_LIMIT:-30}
+      THROTTLER_INGESTION_LIMIT: ${THROTTLER_INGESTION_LIMIT:-600}
+      RETENTION_DAYS: ${RETENTION_DAYS:-90}
+    command: ['node', 'dist/worker.js']
+
+  web:
+    image: olives-web:${TAG:-latest}
+    profiles: ['apps']
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3001}
+    container_name: olives-web
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+
 volumes:
   postgres_data:
   redis_data:

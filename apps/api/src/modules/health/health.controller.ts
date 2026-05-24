@@ -1,5 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisIndicator } from './redis.indicator';
 
 type CheckStatus = 'ok' | 'fail';
 
@@ -11,12 +13,17 @@ interface ReadyResponse {
   status: 'ok' | 'degraded';
   checks: {
     database: CheckStatus;
+    redis: CheckStatus;
   };
 }
 
+@SkipThrottle()
 @Controller('health')
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisIndicator: RedisIndicator,
+  ) {}
 
   @Get('live')
   live(): LiveResponse {
@@ -32,9 +39,8 @@ export class HealthController {
     } catch {
       database = 'fail';
     }
-    return {
-      status: database === 'ok' ? 'ok' : 'degraded',
-      checks: { database },
-    };
+    const redis = await this.redisIndicator.check();
+    const status: ReadyResponse['status'] = database === 'ok' && redis === 'ok' ? 'ok' : 'degraded';
+    return { status, checks: { database, redis } };
   }
 }

@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: olives
+          POSTGRES_PASSWORD: olives
+          POSTGRES_DB: olives
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U olives -d olives"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://olives:olives@localhost:5432/olives
+      REDIS_URL: redis://localhost:6379
+      LOG_LEVEL: warn
+      ANTHROPIC_API_KEY: ci-anthropic-placeholder
+      OPENAI_API_KEY: ci-openai-placeholder
+      INGESTION_API_KEY: ci-ingestion-key-please-change
+      CORS_ORIGIN: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.10.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared types
+        run: pnpm --filter @olives/types build
+
+      - name: Apply Prisma migrations
+        run: pnpm --filter @olives/api exec prisma migrate deploy
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm --filter @olives/api test
+
+      - name: Build api image
+        run: docker build -f apps/api/Dockerfile -t olives-api:ci .
+
+      - name: Build web image
+        run: docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_BASE_URL=http://localhost:3001 -t olives-web:ci .
