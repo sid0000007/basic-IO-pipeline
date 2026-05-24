@@ -1,11 +1,9 @@
-# Olives
+# Base Ingestion||Stream Chatbot I/O
 
 Lightweight inference logging and ingestion system around an LLM chatbot. **Next.js 16 + NestJS + Postgres 16 + Redis 7 + BullMQ**, monorepo, single-VM deployable via Docker Compose.
 
 - **[architecture-notes.md](./architecture-notes.md)** — ingestion flow, logging strategy, scaling, failure handling.
-- **[project-overview.md](./project-overview.md)** — plain-English walkthrough of every feature.
-- **[AGENT.md](./AGENT.md)** — full architectural design doc.
-- **[demo.md](./demo.md)** — demo script.
+
 
 ---
 
