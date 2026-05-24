@@ -14,6 +14,7 @@ export function NewConversationButton() {
     try {
       const conv = await api.createConversation({});
       router.push(`/conversations/${conv.id}`);
+      router.refresh();
     } catch (err) {
       console.error('Failed to create conversation', err);
       setPending(false);
@@ -21,8 +22,8 @@ export function NewConversationButton() {
   }
 
   return (
-    <Button onClick={handleClick} disabled={pending}>
-      {pending ? 'Creating…' : '+ New conversation'}
+    <Button onClick={handleClick} disabled={pending} className="w-full">
+      {pending ? 'Creating…' : '+ New chat'}
     </Button>
   );
 }
