@@ -9,10 +9,10 @@ WORKDIR /repo
 
 # ---- build ----------------------------------------------------------------
 FROM base AS build
-COPY . .
-RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
-RUN pnpm --filter @olives/types build
+  COPY . .
+  # See apps/api/Dockerfile for the rationale — same cache-id constraint.
+  RUN pnpm install --frozen-lockfile
+  RUN pnpm --filter @olives/types build
 # NEXT_PUBLIC_* env vars get inlined at build time. Compose passes them as
 # build args; the override defaults to localhost for ad-hoc local builds.
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:3001

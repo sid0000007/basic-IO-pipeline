@@ -9,12 +9,14 @@ WORKDIR /repo
 
 # ---- build ----------------------------------------------------------------
 FROM base AS build
-COPY . .
-RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
-RUN pnpm --filter @olives/types build \
- && pnpm --filter @olives/api exec prisma generate \
- && pnpm --filter @olives/api build
+  COPY . .
+  # No `--mount=type=cache` for the pnpm store — Railway's BuildKit rejects
+  # unprefixed cache ids, and BuildKit's normal layer cache already skips
+  # this step when pnpm-lock.yaml hasn't changed.
+  RUN pnpm install --frozen-lockfile
+  RUN pnpm --filter @olives/types build \
+   && pnpm --filter @olives/api exec prisma generate \
+   && pnpm --filter @olives/api build
 
 # ---- runtime --------------------------------------------------------------
 FROM node:22-bookworm-slim AS runtime
