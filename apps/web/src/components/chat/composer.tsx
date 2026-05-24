@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Icon } from '@/components/layout/icon';
 
 interface Props {
   disabled: boolean;
@@ -32,20 +31,34 @@ export function Composer({ disabled, onSubmit }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-      <Textarea
+    <form onSubmit={handleSubmit} className="composer">
+      <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Send a message…"
-        rows={3}
+        placeholder="Tell Olive about your deployment…"
+        rows={2}
         disabled={disabled}
         onKeyDown={handleKeyDown}
       />
-      <div className="flex items-center justify-between">
-        <p className="text-muted-foreground text-xs">⌘/Ctrl + Enter to send</p>
-        <Button type="submit" disabled={disabled || value.trim().length === 0}>
-          Send
-        </Button>
+      <div className="composer-foot">
+        <div className="composer-tools">
+          <button type="button" title="Attach">
+            <Icon name="attach" size={14} />
+          </button>
+          <button type="button" title="Image">
+            <Icon name="image" size={14} />
+          </button>
+          <button type="button" title="Tools">
+            <Icon name="wand" size={14} />
+          </button>
+        </div>
+        <button
+          type="submit"
+          className="composer-send"
+          disabled={disabled || value.trim().length === 0}
+        >
+          Send <Icon name="send" size={12} />
+        </button>
       </div>
     </form>
   );

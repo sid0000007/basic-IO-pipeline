@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { MessageDto } from '@olives/types';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Composer } from '@/components/chat/composer';
 import { MessageList } from '@/components/chat/message-list';
+import { Icon } from '@/components/layout/icon';
 import { useStreamingChat } from '@/hooks/use-streaming-chat';
 
 interface Props {
@@ -13,26 +12,42 @@ interface Props {
   initialMessages: MessageDto[];
 }
 
+const SUGGESTIONS = [
+  {
+    tag: 'QUOTE',
+    title: 'Quote my deployment',
+    sub: "Walk through controls, get a binder by end of call.",
+  },
+  {
+    tag: 'INCIDENT',
+    title: 'Report an incident',
+    sub: 'Open a claim or a near-miss for one of your covered perils.',
+  },
+  {
+    tag: 'POLICY',
+    title: 'Explain my coverage',
+    sub: "Plain-language summary of what's covered and what isn't.",
+  },
+  {
+    tag: 'BENCHMARK',
+    title: 'Benchmark my risk',
+    sub: 'Compare your telemetry to similar deployments in our book.',
+  },
+];
+
 export function ChatView({ conversationId, initialMessages }: Props) {
   const [messages, setMessages] = useState<MessageDto[]>(initialMessages);
   const { state, send, cancel, reset } = useStreamingChat(conversationId);
 
-  // The id of the assistant placeholder we created for the current turn.
-  // We mutate THIS message's content as tokens stream in, then flip its
-  // status to completed/cancelled/failed when the stream terminates.
-  // Single source of truth — the messages array — so prior turns never
-  // disappear when a new turn starts.
   const streamingIdRef = useRef<string | null>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll the messages pane to the bottom whenever content changes.
-  const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const el = scrollRef.current;
+    const el = threadRef.current;
     if (el === null) return;
     el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  // Sync the streaming hook's state into the placeholder message.
   useEffect(() => {
     const streamingId = streamingIdRef.current;
     if (streamingId === null) return;
@@ -71,8 +86,6 @@ export function ChatView({ conversationId, initialMessages }: Props) {
         prev.map((m) => (m.id === streamingId ? { ...m, status: 'failed' } : m)),
       );
       streamingIdRef.current = null;
-      // Don't reset() — keep state.message visible in the error banner below
-      // until the user clicks the Reset button.
     }
   }, [state, reset]);
 
@@ -108,31 +121,75 @@ export function ChatView({ conversationId, initialMessages }: Props) {
   const isStreaming = state.status === 'streaming';
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto pr-2">
+    <>
+      <div className="thread" ref={threadRef}>
         <MessageList messages={messages} />
         {state.status === 'error' && (
-          <div className="mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-800">
-            {state.message}
+          <div
+            style={{
+              borderRadius: 'var(--radius)',
+              border: '1px solid color-mix(in oklch, var(--err) 30%, transparent)',
+              background: 'color-mix(in oklch, var(--err) 8%, transparent)',
+              color: 'var(--err)',
+              padding: '10px 12px',
+              fontSize: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <span>{state.message}</span>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={reset}>
+              Dismiss
+            </button>
           </div>
         )}
       </div>
-      <div className="shrink-0">
-        <Separator className="mb-3" />
-        <div className="flex flex-col gap-2">
-          <Composer disabled={isStreaming} onSubmit={handleSubmit} />
-          {isStreaming && (
-            <Button type="button" variant="outline" onClick={cancel}>
-              Cancel generation
-            </Button>
-          )}
-          {state.status === 'error' && (
-            <Button type="button" variant="ghost" size="sm" onClick={reset}>
-              Dismiss error
-            </Button>
+
+      <div className="composer-wrap">
+        {messages.length === 0 && (
+          <div className="suggestions">
+            {SUGGESTIONS.map((s) => (
+              <button
+                key={s.tag}
+                type="button"
+                className="suggestion"
+                onClick={() => {
+                  void handleSubmit(`${s.title}.`);
+                }}
+                disabled={isStreaming}
+              >
+                <span className="tag">{s.tag}</span>
+                <strong>{s.title}</strong>
+                <span>{s.sub}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <Composer disabled={isStreaming} onSubmit={handleSubmit} />
+        <div className="composer-hint">
+          <span className="kbd">⌘</span>
+          <span className="kbd">↵</span>
+          <span>to send</span>
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={cancel}
+              style={{
+                marginLeft: 'auto',
+                color: 'var(--err)',
+                fontSize: 11,
+                borderBottom: '1px dotted',
+              }}
+            >
+              Cancel generation <Icon name="x" size={10} />
+            </button>
+          ) : (
+            <span style={{ marginLeft: 'auto' }}>Logged to telemetry</span>
           )}
         </div>
       </div>
-    </div>
+    </>
   );
 }

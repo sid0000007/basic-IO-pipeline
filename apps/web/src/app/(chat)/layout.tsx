@@ -1,5 +1,4 @@
 import { api } from '@/lib/api-client';
-import { SiteHeader } from '@/components/layout/site-header';
 import { ConversationsSidebar } from '@/components/chat/conversations-sidebar';
 
 export const dynamic = 'force-dynamic';
@@ -15,12 +14,9 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <div className="flex h-screen flex-col">
-      <SiteHeader />
-      <div className="mx-auto flex w-full max-w-6xl min-h-0 flex-1 gap-6 px-6 py-6">
-        <ConversationsSidebar items={items} loadError={loadError} />
-        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
-      </div>
+    <div className="chat-grid">
+      <ConversationsSidebar items={items} loadError={loadError} />
+      <main className="chat-main">{children}</main>
     </div>
   );
 }

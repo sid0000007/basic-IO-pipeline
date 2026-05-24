@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/layout/icon';
 import { api } from '@/lib/api-client';
 
 export function NewConversationButton() {
@@ -22,8 +22,11 @@ export function NewConversationButton() {
   }
 
   return (
-    <Button onClick={handleClick} disabled={pending} className="w-full">
-      {pending ? 'Creating…' : '+ New chat'}
-    </Button>
+    <button type="button" className="rail-new" onClick={handleClick} disabled={pending}>
+      <span>{pending ? 'Creating…' : 'New review'}</span>
+      <span className="plus">
+        <Icon name="plus" size={16} />
+      </span>
+    </button>
   );
 }

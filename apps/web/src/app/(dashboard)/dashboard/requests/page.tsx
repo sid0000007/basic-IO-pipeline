@@ -1,7 +1,6 @@
-import Link from 'next/link';
 import type { ListInferenceRequestsResponse } from '@olives/types';
 import { api } from '@/lib/api-client';
-import { Card } from '@/components/ui/card';
+import { Icon } from '@/components/layout/icon';
 import { InferenceRequestTable } from '@/components/dashboard/inference-request-table';
 
 export const dynamic = 'force-dynamic';
@@ -16,34 +15,41 @@ export default async function RequestsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Inference requests</h1>
-        <p className="text-muted-foreground text-sm">
-          Most recent first. Click a row for the full event timeline.
-        </p>
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <h1>Inference log</h1>
+          <p>
+            Every model call routed through Olives. Click a row for the full event timeline —
+            the same one our underwriters see.
+          </p>
+        </div>
+        <div className="row">
+          <button type="button" className="btn btn-ghost btn-sm">
+            <Icon name="filter" size={13} /> Filters
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm">
+            <Icon name="download" size={13} /> Export CSV
+          </button>
+        </div>
       </div>
 
       {loadError !== null || res === null ? (
-        <Card className="border-red-300 bg-red-50 p-4 text-sm text-red-800">
-          <p className="font-medium">Could not load requests</p>
-          <p className="mt-1 text-xs">{loadError ?? 'Unknown error'}</p>
-        </Card>
+        <div
+          style={{
+            padding: 16,
+            border: '1px solid color-mix(in oklch, var(--err) 30%, transparent)',
+            background: 'color-mix(in oklch, var(--err) 8%, transparent)',
+            color: 'var(--err)',
+            borderRadius: 'var(--radius)',
+            fontSize: 13,
+          }}
+        >
+          <p style={{ margin: 0, fontWeight: 500 }}>Could not load requests</p>
+          <p style={{ margin: '4px 0 0', fontSize: 12 }}>{loadError ?? 'Unknown error'}</p>
+        </div>
       ) : (
-        <>
-          <InferenceRequestTable items={res.items} />
-          {res.nextCursor !== null && (
-            <p className="text-muted-foreground text-xs">
-              More pages exist. Pagination UI is a Phase 4 enhancement; for now the cursor token is{' '}
-              <Link
-                href={`/dashboard/requests?cursor=${encodeURIComponent(res.nextCursor)}`}
-                className="underline"
-              >
-                next page →
-              </Link>
-            </p>
-          )}
-        </>
+        <InferenceRequestTable items={res.items} />
       )}
     </div>
   );
